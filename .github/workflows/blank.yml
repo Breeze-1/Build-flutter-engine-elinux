@@ -1,0 +1,118 @@
+name: Main
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: 00 16 * * *
+  watch:
+    types: [started]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build-flutter-engine:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@v4
+      with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-haskell: 'true'
+          remove-android: 'true'
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Echo Free space
+      run: |
+          echo "Free space:"
+          df -h
+    - name: Set up Python 2.x
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10' 
+    - name: Prepare Env
+      run: |
+        sudo apt-get update
+        sudo apt-get install g++-aarch64-linux-gnu g++-arm-linux-gnueabihf
+        sudo apt-get install g++-multilib gcc-multilib
+        sudo apt-get install zip
+    - name: Get Resource
+      run: |
+        git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+        export PATH="$PATH:$PWD/depot_tools"
+        mkdir flutter-engine
+        echo 'solutions = [
+        {
+         "managed": False,
+         "name": "src/flutter",
+         "url": "https://github.com/flutter/engine",
+         "custom_deps": {},
+         "deps_file": "DEPS",
+         "safesync_url": "",
+        },
+        ]' >> flutter-engine/.gclient
+        cd flutter-engine
+        gclient sync
+    - name: Build Engine
+      run: |
+        export PATH="$PATH:$PWD/depot_tools"
+        cd flutter-engine/src
+        ls flutter/
+        ls flutter/tools
+        /flutter/tools/gn --target-os linux --linux-cpu arm64 --runtime-mode debug --unoptimized \
+                     --embedder-for-target --disable-desktop-embeddings --no-build-embedder-examples \
+                     --enable-fontconfig
+         ninja -C out/linux_debug_unopt_arm64
+         ./flutter/tools/gn --target-os linux --linux-cpu arm64 --runtime-mode profile --no-lto \
+                     --embedder-for-target --disable-desktop-embeddings --no-build-embedder-examples \
+                     --enable-fontconfig
+         ninja -C out/linux_profile_arm64
+         ./flutter/tools/gn --target-os linux --linux-cpu arm64 --runtime-mode release \
+                     --embedder-for-target --disable-desktop-embeddings --no-build-embedder-examples \
+                     --enable-fontconfig
+         ninja -C out/elinux_release_arm64
+         ./flutter/tools/gn --runtime-mode debug --unoptimized \
+                     --embedder-for-target --disable-desktop-embeddings --no-build-embedder-examples \
+                     --enable-fontconfig
+         ninja -C out/host_debug_unopt
+         ./flutter/tools/gn --runtime-mode profile --no-lto \
+                     --embedder-for-target --disable-desktop-embeddings --no-build-embedder-examples \
+                     --enable-fontconfig
+         ninja -C out/host_profile
+         ./flutter/tools/gn --runtime-mode release \
+                     --embedder-for-target --disable-desktop-embeddings --no-build-embedder-examples \
+                     --enable-fontconfig
+         ninja -C out/host_release
+    - name: Zip Engine
+      run: |
+        cd flutter-engine/src/out
+        ls
+        zip -q -r host_debug_unopt.zip host_debug_unopt
+        zip -q -r host_profile.zip host_profile
+        zip -q -r linux_debug_unopt_arm64.zip linux_debug_unopt_arm64
+        zip -q -r linux_profile_arm64.zip linux_profile_arm64
+        zip -q -r enlinux_release_arm64.zip elinux_release_arm64
+        zip -q -r host_release.zip host_release
+
+
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Test with environment variables
+      run: echo $TAG_NAME - $RELEASE_TIME
+      env:
+          TAG_NAME: Flutter-ARM64
+          RELEASE_TIME: ${{ steps.date.outputs.date }}
+    - name: Release Engine
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "flutter-engine/src/out/*.zip"
+        tag: Flutter-ARM64-${{ steps.date.outputs.date }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
