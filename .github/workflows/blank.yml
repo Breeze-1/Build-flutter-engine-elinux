@@ -11,14 +11,7 @@ on:
     types: [started]
 
   # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-      inputs:
-        Version:
-          description: 'Enter you want build version👁️‍🗨️ '
-          required: true
-        #Token: 
-         #  description: 'Brah add your TOKEN👽'
-          # required: true
+  workflow_dispatch:  
 
 jobs:
   build-flutter-engine:
@@ -58,7 +51,7 @@ jobs:
         {
           "managed": False,
           "name": "src/flutter",
-          "url": "https://github.com/flutter/engine.git@@${{ github.event.inputs.Version }}",
+          "url": "https://github.com/flutter/engine.git@aac09195688da6b85bdab015b881a9a04bd1e726",
           "custom_deps": {},
           "deps_file": "DEPS",
           "safesync_url": "",
