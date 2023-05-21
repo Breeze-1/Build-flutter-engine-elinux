@@ -12,6 +12,13 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+      inputs:
+        Version:
+          description: 'Enter you want build version👁️‍🗨️ '
+          required: true
+        #Token: 
+         #  description: 'Brah add your TOKEN👽'
+          # required: true
 
 jobs:
   build-flutter-engine:
@@ -49,12 +56,16 @@ jobs:
         mkdir flutter-engine
         echo 'solutions = [
         {
-         "managed": False,
-         "name": "src/flutter",
-         "url": "https://github.com/flutter/engine",
-         "custom_deps": {},
-         "deps_file": "DEPS",
-         "safesync_url": "",
+          "managed": False,
+          "name": "src/flutter",
+          "url": "https://github.com/flutter/engine.git@@${{ github.event.inputs.Version }}",
+          "custom_deps": {},
+          "deps_file": "DEPS",
+          "safesync_url": "",
+          "custom_vars" : {
+            "download_android_deps" : False,
+            "download_windows_deps" : False,
+          },
         },
         ]' >> flutter-engine/.gclient
         cd flutter-engine
